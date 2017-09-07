@@ -1,0 +1,11 @@
+[package]
+name = "send_wrapper"
+version = "0.1.0"
+authors = ["Thomas Keh <thk@mail.de>"]
+description = """
+Wrapper type which provides the Sync marker to any data type. The data can only
+be accessed in the thread which created the wrapper. The user must make sure
+that the wrapper has returned to the original thread before being dropped. This
+crate allows you to move any type between threads if and only if it is only used
+(meaining: dereferenced) in the original thread."""
+keywords = ["send", "wrapper", "thread_local"]
