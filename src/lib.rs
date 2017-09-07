@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! This library implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`]-types
+//! This [Rust] library implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`] types
 //! between threads, as long as you access the contained value only from within the original thread. You also have to
 //! make sure that the wrapper is dropped from within the original thread. If any of these constraints is violated,
 //! a panic occurs.
@@ -43,12 +43,12 @@
 //!
 //! let t = thread::spawn(move || {
 //!
-//!		// This would panic (because of dereferencing in wrong thread):
-//!		// let value = wrapped_value.deref();
+//!// This would panic (because of dereferencing in wrong thread):
+//!// let value = wrapped_value.deref();
 //!
-//!	 // Move SendWrapper back to main thread, so it can be dropped from there.
-//!		// If you leave this out the thread will panic because of dropping from wrong thread.
-//!	 sender.send(wrapped_value).unwrap();
+//! 	// Move SendWrapper back to main thread, so it can be dropped from there.
+//! 	// If you leave this out the thread will panic because of dropping from wrong thread.
+//! 	sender.send(wrapped_value).unwrap();
 //!
 //! });
 //!
@@ -67,6 +67,13 @@
 //! // let mut value: &mut NonSendType = &mut wrapped_value;
 //! ```
 //!
+//! # License
+//!
+//! `send_wrapper` is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
+//!
+//! See LICENSE-APACHE.txt, and LICENSE-MIT.txt for details.
+//!
+//! [Rust]: https://www.rust-lang.org
 //! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 //! [`gtk-rs`]: http://gtk-rs.org/
 //! [`GTK+`]: https://www.gtk.org/
