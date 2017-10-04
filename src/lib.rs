@@ -110,6 +110,20 @@ impl<T> SendWrapper<T> {
 		self.thread_id == thread::current().id()
 	}
 
+	/// Takes the value out of the SendWrapper.
+	///
+	/// #Panics
+	/// Panics if it is called from a different thread than the one the SendWrapper<T> instance has
+	/// been created with.
+	pub fn take(self) -> T {
+		if !self.valid() {
+			panic!(DEREF_ERROR);
+		}
+		let result = unsafe { Box::from_raw(self.data) };
+		// Prevent drop() from being called, as it would drop self.data twice
+		std::mem::forget(self);
+		*result
+	}
 }
 
 unsafe impl<T> Send for SendWrapper<T> { }
@@ -231,6 +245,22 @@ mod tests {
 		thread::spawn(move || {
 			assert!(!w.valid());
 		});
+	}
+
+	#[test]
+	fn test_take() {
+		let w = SendWrapper::new(Rc::new(42));
+		let inner: Rc<usize> = w.take();
+		assert_eq!(42, *inner);
+	}
+
+	#[test]
+	fn test_take_panic() {
+		let w = SendWrapper::new(Rc::new(42));
+		let t = thread::spawn(move || {
+			let _ = w.take();
+		});
+		assert!(t.join().is_err());
 	}
 
 }
