@@ -9,7 +9,7 @@
 //! This [Rust] library implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`] types
 //! between threads, as long as you access the contained value only from within the original thread. You also have to
 //! make sure that the wrapper is dropped from within the original thread. If any of these constraints is violated,
-//! a panic occurs.
+//! a panic occurs. `SendWrapper<T>` implements [`Send`] and [`Sync`] for any type `T`.
 //!
 //! The idea for this library was born in the context of a [`GTK+`]/[`gtk-rs`]-based application. [`GTK+`] applications
 //! are strictly single-threaded. It is not allowed to call any [`GTK+`] method from a thread different to the main
@@ -18,7 +18,7 @@
 //! Sometimes you still want to do some work in background. It is possible to enqueue [`GTK+`] calls from there to be
 //! executed in the main thread [using `Glib`]. This way you can know, that the [`gtk-rs`] structs involved are only
 //! accessed in the main thread and will also be dropped there. This library makes it possible that [`gtk-rs`] structs
-//! can leave the main thread at all, like required in the given
+//! can leave the main thread at all.
 //!
 //! # Examples
 //!
@@ -75,6 +75,7 @@
 //!
 //! [Rust]: https://www.rust-lang.org
 //! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
+//! [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
 //! [`gtk-rs`]: http://gtk-rs.org/
 //! [`GTK+`]: https://www.gtk.org/
 //! [using `Glib`]: http://gtk-rs.org/docs/glib/source/fn.idle_add.html
@@ -200,6 +201,7 @@ mod tests {
 	use std::sync::mpsc::channel;
 	use std::ops::Deref;
 	use std::rc::Rc;
+	use std::sync::Arc;
 
 	#[test]
 	fn test_deref() {
@@ -262,6 +264,15 @@ mod tests {
 			let _ = w.take();
 		});
 		assert!(t.join().is_err());
+	}
+
+	#[test]
+	fn test_sync() {
+		// Arc<T> can only be sent to another thread if T Sync
+		let arc = Arc::new(SendWrapper::new(42));
+		thread::spawn(move || {
+			let _ = arc;
+		});
 	}
 
 }
