@@ -80,6 +80,7 @@
 //! [`GTK+`]: https://www.gtk.org/
 //! [using `Glib`]: http://gtk-rs.org/docs/glib/source/fn.idle_add.html
 
+use std::fmt;
 use std::ops::{Drop,Deref,DerefMut};
 use std::marker::Send;
 use std::thread;
@@ -193,6 +194,46 @@ impl<T> Drop for SendWrapper<T> {
 	}
 }
 
+impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
+
+	/// Formats the value using the given formatter.
+	///
+	/// # Panics
+	/// Formatting panics if it is done from a different thread than the one
+	/// the SendWrapper<T> instance has been created with.
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		if !self.valid() {
+			panic!(DEREF_ERROR);
+		}
+		// This is safe as `self.data` is guaranteed to be alive as long
+		// as `self` is alive.
+		f.debug_struct("SendWrapper")
+			.field("data", unsafe { &*self.data })
+			.field("thread_id", &self.thread_id)
+			.finish()
+	}
+}
+
+impl<T: Clone> Clone for SendWrapper<T> {
+
+	/// Returns a copy of the value.
+	///
+	/// # Panics
+	/// Cloning panics if it is done from a different thread than the one
+	/// the SendWrapper<T> instance has been created with.
+	fn clone(&self) -> Self {
+		if !self.valid() {
+			panic!(DEREF_ERROR);
+		}
+		// We need to clone the underlying data as well, not just to copy
+		// the pointer.
+		Self {
+			data: Box::into_raw(Box::new(unsafe { &*self.data }.clone())),
+			thread_id: self.thread_id,
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -273,6 +314,40 @@ mod tests {
 		thread::spawn(move || {
 			let _ = arc;
 		});
+	}
+
+	#[test]
+	fn test_debug() {
+		let w = SendWrapper::new(Rc::new(42));
+		let info = format!("{:?}", w);
+		assert!(info.contains("SendWrapper {"));
+		assert!(info.contains("data: 42,"));
+		assert!(info.contains("thread_id: ThreadId("));
+	}
+
+	#[test]
+	fn test_debug_panic() {
+		let w = SendWrapper::new(Rc::new(42));
+		let t = thread::spawn(move || {
+			let _ = format!("{:?}", w);
+		});
+		assert!(t.join().is_err());
+	}
+
+	#[test]
+	fn test_clone() {
+		let w1 = SendWrapper::new(Rc::new(42));
+		let w2 = w1.clone();
+		assert_eq!(format!("{:?}", w1), format!("{:?}", w2));
+	}
+
+	#[test]
+	fn test_clone_panic() {
+		let w = SendWrapper::new(Rc::new(42));
+		let t = thread::spawn(move || {
+			let _ = w.clone();
+		});
+		assert!(t.join().is_err());
 	}
 
 }
