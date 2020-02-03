@@ -81,12 +81,13 @@
 //! [using `Glib`]: http://gtk-rs.org/docs/glib/source/fn.idle_add.html
 
 use std::fmt;
-use std::ops::{Drop,Deref,DerefMut};
 use std::marker::Send;
+use std::ops::{Deref, DerefMut, Drop};
 use std::thread;
 use std::thread::ThreadId;
 
-const DEREF_ERROR: &'static str = "Dropped SendWrapper<T> variable from a thread different to the one it has been created with.";
+const DEREF_ERROR: &'static str =
+	"Dropped SendWrapper<T> variable from a thread different to the one it has been created with.";
 const DROP_ERROR: &'static str = "Dereferenced SendWrapper<T> variable from a thread different to the one it has been created with.";
 
 /// A wrapper which allows you to move around non-[`Send`]-types between threads, as long as you access the contained
@@ -97,13 +98,12 @@ pub struct SendWrapper<T> {
 }
 
 impl<T> SendWrapper<T> {
-
 	/// Create a SendWrapper<T> wrapper around a value of type T.
 	/// The wrapper takes ownership of the value.
 	pub fn new(data: T) -> SendWrapper<T> {
 		SendWrapper {
 			data: Box::into_raw(Box::new(data)),
-			thread_id: thread::current().id()
+			thread_id: thread::current().id(),
 		}
 	}
 
@@ -128,8 +128,8 @@ impl<T> SendWrapper<T> {
 	}
 }
 
-unsafe impl<T> Send for SendWrapper<T> { }
-unsafe impl<T> Sync for SendWrapper<T> { }
+unsafe impl<T> Send for SendWrapper<T> {}
+unsafe impl<T> Sync for SendWrapper<T> {}
 
 impl<T> Deref for SendWrapper<T> {
 	type Target = T;
@@ -151,7 +151,6 @@ impl<T> Deref for SendWrapper<T> {
 }
 
 impl<T> DerefMut for SendWrapper<T> {
-
 	/// Returns a mutable reference to the contained value.
 	///
 	/// # Panics
@@ -169,7 +168,6 @@ impl<T> DerefMut for SendWrapper<T> {
 }
 
 impl<T> Drop for SendWrapper<T> {
-
 	/// Drops the contained value.
 	///
 	/// # Panics
@@ -195,7 +193,6 @@ impl<T> Drop for SendWrapper<T> {
 }
 
 impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
-
 	/// Formats the value using the given formatter.
 	///
 	/// # Panics
@@ -215,7 +212,6 @@ impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
 }
 
 impl<T: Clone> Clone for SendWrapper<T> {
-
 	/// Returns a copy of the value.
 	///
 	/// # Panics
@@ -237,12 +233,12 @@ impl<T: Clone> Clone for SendWrapper<T> {
 #[cfg(test)]
 mod tests {
 
-	use SendWrapper;
-	use std::thread;
-	use std::sync::mpsc::channel;
 	use std::ops::Deref;
 	use std::rc::Rc;
+	use std::sync::mpsc::channel;
 	use std::sync::Arc;
+	use std::thread;
+	use SendWrapper;
 
 	#[test]
 	fn test_deref() {
@@ -349,5 +345,4 @@ mod tests {
 		});
 		assert!(t.join().is_err());
 	}
-
 }
