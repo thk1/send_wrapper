@@ -80,6 +80,9 @@
 //! [`GTK+`]: https://www.gtk.org/
 //! [using `Glib`]: http://gtk-rs.org/docs/glib/source/fn.idle_add.html
 
+#[cfg(feature = "futures")]
+pub mod futures;
+
 use std::fmt;
 use std::marker::Send;
 use std::ops::{Deref, DerefMut, Drop};
@@ -232,13 +235,13 @@ impl<T: Clone> Clone for SendWrapper<T> {
 
 #[cfg(test)]
 mod tests {
-
 	use std::ops::Deref;
 	use std::rc::Rc;
 	use std::sync::mpsc::channel;
 	use std::sync::Arc;
 	use std::thread;
-	use SendWrapper;
+
+	use super::SendWrapper;
 
 	#[test]
 	fn test_deref() {
