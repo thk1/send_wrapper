@@ -17,6 +17,9 @@ can leave the main thread at all, like required in the given
 
 [Documentation](https://docs.rs/send_wrapper)
 
+
+
+
 # Examples
 
 ```rust
@@ -64,11 +67,47 @@ let value = wrapped_value.deref();
 // let mut value: &mut NonSendType = &mut wrapped_value;
 ```
 
+
+## Using with `Future`
+
+To use `SendWrapper` on `Future`s, you should enable `futures` Cargo feature first:
+```toml
+send_wrapper = { version = "0.5", features = ["futures"] }
+```
+
+And then, just wrap your `Future` (or `Stream`):
+```rust
+use futures::{executor, future::{self, BoxFuture}};
+use send_wrapper::SendWrapper;
+
+// `Rc` is a `!Send` type,
+let value = Rc::new(42);
+// so this `Future` is `!Send` too as increments `Rc`'s inner counter.
+let future = future::lazy(|_| value.clone());
+
+// We now wrap the `future` with `SendWrapper` (value is moved inside),
+let wrapped_future = SendWrapper::new(future);
+// so now it's `Send` + `Sync` (`BoxFuture` trait object contains `Send` requirement).
+let boxed_future: BoxFuture<_> = Box::pin(wrapped_future);
+
+let t = thread::spawn(move || {
+	// This would panic (because `future` is polled in wrong thread):
+	// executor::block_on(boxed_future)
+});
+```
+
+
+
+
 # License
 
 `send_wrapper` is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
 
 See LICENSE-APACHE, and LICENSE-MIT for details.
+
+
+
+
 
 [Rust]: https://www.rust-lang.org
 [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
