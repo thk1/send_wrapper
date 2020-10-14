@@ -1,24 +1,19 @@
 SendWrapper
 ===========
 
-This [Rust] library implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`] types
+This [Rust] crate implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`] types
 between threads, as long as you access the contained value only from within the original thread. You also have to
 make sure that the wrapper is dropped from within the original thread. If any of these constraints is violated,
 a panic occurs.
 
-The idea for this library was born in the context of a [`GTK+`]/[`gtk-rs`]-based application. [`GTK+`] applications
+The idea for this crate was born in the context of a [`GTK+`]/[`gtk-rs`]-based application. [`GTK+`] applications
 are strictly single-threaded. It is not allowed to call any [`GTK+`] method from a thread different to the main
 thread. Consequently, all [`gtk-rs`] structs are non-[`Send`].
 
 Sometimes you still want to do some work in background. It is possible to enqueue [`GTK+`] calls from there to be
 executed in the main thread [using `Glib`]. This way you can know, that the [`gtk-rs`] structs involved are only
-accessed in the main thread and will also be dropped there. This library makes it possible that [`gtk-rs`] structs
-can leave the main thread at all, like required in the given
-
-[Documentation](https://docs.rs/send_wrapper)
-
-
-
+accessed in the main thread and will also be dropped there. This crate makes it possible for [`gtk-rs`] structs
+to leave the main thread.
 
 # Examples
 
@@ -68,14 +63,14 @@ let value = wrapped_value.deref();
 ```
 
 
-## Using with `Future`
+## Wrapping `Future`s and `Stream`s
 
-To use `SendWrapper` on `Future`s, you should enable `futures` Cargo feature first:
+To use `SendWrapper` on `Future`s or `Stream`s, you should enable the Cargo feature `futures` first:
 ```toml
 send_wrapper = { version = "0.5", features = ["futures"] }
 ```
 
-And then, just wrap your `Future` (or `Stream`):
+Then, you can transparently wrap your `Future` or `Stream`:
 ```rust
 use futures::{executor, future::{self, BoxFuture}};
 use send_wrapper::SendWrapper;
@@ -97,16 +92,15 @@ let t = thread::spawn(move || {
 ```
 
 
+# Changelog
 
+See [CHANGELOG.md](CHANGELOG.md)
 
 # License
 
 `send_wrapper` is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
 
 See LICENSE-APACHE, and LICENSE-MIT for details.
-
-
-
 
 
 [Rust]: https://www.rust-lang.org
