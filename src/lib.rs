@@ -129,6 +129,7 @@ impl<T> SendWrapper<T> {
 	///
 	/// Panics if it is called from a different thread than the one the `SendWrapper<T>` instance has
 	/// been created with.
+	#[track_caller]
 	pub fn take(self) -> T {
 		self.assert_valid_for_deref();
 
@@ -141,12 +142,14 @@ impl<T> SendWrapper<T> {
 		unsafe { ManuallyDrop::take(&mut this.data) }
 	}
 
+	#[track_caller]
 	fn assert_valid_for_deref(&self) {
 		if !self.valid() {
 			invalid_deref()
 		}
 	}
 
+	#[track_caller]
 	fn assert_valid_for_poll(&self) {
 		if !self.valid() {
 			invalid_poll()
@@ -166,6 +169,7 @@ impl<T> Deref for SendWrapper<T> {
 	///
 	/// Dereferencing panics if it is done from a different thread than the one the `SendWrapper<T>` instance has been
 	/// created with.
+	#[track_caller]
 	fn deref(&self) -> &T {
 		self.assert_valid_for_deref();
 
@@ -183,6 +187,7 @@ impl<T> DerefMut for SendWrapper<T> {
 	///
 	/// Dereferencing panics if it is done from a different thread than the one the `SendWrapper<T>` instance has been
 	/// created with.
+	#[track_caller]
 	fn deref_mut(&mut self) -> &mut T {
 		self.assert_valid_for_deref();
 
@@ -208,6 +213,7 @@ impl<T> Drop for SendWrapper<T> {
 	/// - If `T` has a trivial drop ([`needs_drop::<T>()`] is false) then this method never panics.
 	///
 	/// [`needs_drop::<T>()`]: std::mem::needs_drop
+	#[track_caller]
 	fn drop(&mut self) {
 		// If the drop is trivial (`needs_drop` = false), then dropping `T` can't access it
 		// and so it can be safely dropped on any thread.
@@ -233,6 +239,7 @@ impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
 	///
 	/// Formatting panics if it is done from a different thread than the one
 	/// the `SendWrapper<T>` instance has been created with.
+	#[track_caller]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("SendWrapper")
 			.field("data", self.deref())
@@ -248,6 +255,7 @@ impl<T: Clone> Clone for SendWrapper<T> {
 	///
 	/// Cloning panics if it is done from a different thread than the one
 	/// the `SendWrapper<T>` instance has been created with.
+	#[track_caller]
 	fn clone(&self) -> Self {
 		Self::new(self.deref().clone())
 	}
@@ -255,6 +263,7 @@ impl<T: Clone> Clone for SendWrapper<T> {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 fn invalid_deref() -> ! {
 	const DEREF_ERROR: &'static str = "Dereferenced SendWrapper<T> variable from a thread different to the one it has been created with.";
 
@@ -263,6 +272,7 @@ fn invalid_deref() -> ! {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 fn invalid_poll() -> ! {
 	const POLL_ERROR: &'static str = "Polling SendWrapper<T> variable from a thread different to the one it has been created with.";
 
@@ -271,6 +281,7 @@ fn invalid_poll() -> ! {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 fn invalid_drop() {
 	const DROP_ERROR: &'static str = "Dropped SendWrapper<T> variable from a thread different to the one it has been created with.";
 

@@ -19,6 +19,7 @@ impl<F: Future> Future for SendWrapper<F> {
 	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
+	#[track_caller]
 	fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
 		self.assert_valid_for_poll();
 		// This is safe as `SendWrapper` itself points to the inner `Future`.
@@ -36,6 +37,7 @@ impl<S: Stream> Stream for SendWrapper<S> {
 	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
+	#[track_caller]
 	fn poll_next(
 		self: Pin<&mut Self>,
 		cx: &mut task::Context<'_>,
