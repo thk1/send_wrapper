@@ -89,11 +89,6 @@ use std::ops::{Deref, DerefMut, Drop};
 use std::thread;
 use std::thread::ThreadId;
 
-const DEREF_ERROR: &'static str =
-	"Dereferenced SendWrapper<T> variable from a thread different to the one it has been created with.";
-const DROP_ERROR: &'static str =
-	"Dropped SendWrapper<T> variable from a thread different to the one it has been created with.";
-
 /// A wrapper which allows you to move around non-[`Send`]-types between threads, as long as you access the contained
 /// value only from within the original thread and make sure that it is dropped from within the original thread.
 pub struct SendWrapper<T> {
@@ -122,13 +117,23 @@ impl<T> SendWrapper<T> {
 	/// Panics if it is called from a different thread than the one the SendWrapper<T> instance has
 	/// been created with.
 	pub fn take(self) -> T {
-		if !self.valid() {
-			panic!(DEREF_ERROR);
-		}
+		self.assert_valid_for_deref();
 		let result = unsafe { Box::from_raw(self.data) };
 		// Prevent drop() from being called, as it would drop self.data twice
 		std::mem::forget(self);
 		*result
+	}
+
+	fn assert_valid_for_deref(&self) {
+		if !self.valid() {
+			invalid_deref()
+		}
+	}
+
+	fn assert_valid_for_poll(&self) {
+		if !self.valid() {
+			invalid_poll()
+		}
 	}
 }
 
@@ -144,9 +149,7 @@ impl<T> Deref for SendWrapper<T> {
 	/// Derefencing panics if it is done from a different thread than the one the SendWrapper<T> instance has been
 	/// created with.
 	fn deref(&self) -> &T {
-		if !self.valid() {
-			panic!(DEREF_ERROR);
-		}
+		self.assert_valid_for_deref();
 		unsafe {
 			// Access the value. We just checked that it is valid.
 			&*self.data
@@ -161,9 +164,7 @@ impl<T> DerefMut for SendWrapper<T> {
 	/// Derefencing panics if it is done from a different thread than the one the SendWrapper<T> instance has been
 	/// created with.
 	fn deref_mut(&mut self) -> &mut T {
-		if !self.valid() {
-			panic!(DEREF_ERROR);
-		}
+		self.assert_valid_for_deref();
 		unsafe {
 			// Access the value. We just checked that it is valid.
 			&mut *self.data
@@ -187,11 +188,7 @@ impl<T> Drop for SendWrapper<T> {
 				let _dropper = Box::from_raw(self.data);
 			}
 		} else {
-			if !std::thread::panicking() {
-				// panic because of dropping from wrong thread
-				// only do this while not unwinding (coud be caused by deref from wrong thread)
-				panic!(DROP_ERROR);
-			}
+			invalid_drop()
 		}
 	}
 }
@@ -203,9 +200,7 @@ impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
 	/// Formatting panics if it is done from a different thread than the one
 	/// the SendWrapper<T> instance has been created with.
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		if !self.valid() {
-			panic!(DEREF_ERROR);
-		}
+		self.assert_valid_for_deref();
 		// This is safe as `self.data` is guaranteed to be alive as long
 		// as `self` is alive.
 		f.debug_struct("SendWrapper")
@@ -222,15 +217,41 @@ impl<T: Clone> Clone for SendWrapper<T> {
 	/// Cloning panics if it is done from a different thread than the one
 	/// the SendWrapper<T> instance has been created with.
 	fn clone(&self) -> Self {
-		if !self.valid() {
-			panic!(DEREF_ERROR);
-		}
+		self.assert_valid_for_deref();
 		// We need to clone the underlying data as well, not just to copy
 		// the pointer.
 		Self {
 			data: Box::into_raw(Box::new(unsafe { &*self.data }.clone())),
 			thread_id: self.thread_id,
 		}
+	}
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_deref() -> ! {
+	const DEREF_ERROR: &'static str = "Dereferenced SendWrapper<T> variable from a thread different to the one it has been created with.";
+
+	panic!("{}", DEREF_ERROR)
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_poll() -> ! {
+	const POLL_ERROR: &'static str = "Polling SendWrapper<T> variable from a thread different to the one it has been created with.";
+
+	panic!("{}", POLL_ERROR)
+}
+
+#[cold]
+#[inline(never)]
+fn invalid_drop() {
+	const DROP_ERROR: &'static str = "Dropped SendWrapper<T> variable from a thread different to the one it has been created with.";
+
+	if !std::thread::panicking() {
+		// panic because of dropping from wrong thread
+		// only do this while not unwinding (coud be caused by deref from wrong thread)
+		panic!("{}", DROP_ERROR)
 	}
 }
 
