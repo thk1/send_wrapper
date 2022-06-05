@@ -97,11 +97,9 @@
 mod futures;
 
 use std::fmt;
-use std::marker::Send;
-use std::mem::ManuallyDrop;
+use std::mem::{self, ManuallyDrop};
 use std::ops::{Deref, DerefMut, Drop};
-use std::thread;
-use std::thread::ThreadId;
+use std::thread::{self, ThreadId};
 
 /// A wrapper which allows you to move around non-[`Send`]-types between threads, as long as you access the contained
 /// value only from within the original thread and make sure that it is dropped from within the original thread.
@@ -213,7 +211,7 @@ impl<T> Drop for SendWrapper<T> {
 	fn drop(&mut self) {
 		// If the drop is trivial (`needs_drop` = false), then dropping `T` can't access it
 		// and so it can be safely dropped on any thread.
-		if !std::mem::needs_drop::<T>() || self.valid() {
+		if !mem::needs_drop::<T>() || self.valid() {
 			unsafe {
 				// Drop the inner value
 				//

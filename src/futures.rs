@@ -8,7 +8,7 @@ use std::{
 
 use futures_core::Stream;
 
-use super::SendWrapper;
+use crate::SendWrapper;
 
 impl<F: Future> Future for SendWrapper<F> {
 	type Output = F::Output;
