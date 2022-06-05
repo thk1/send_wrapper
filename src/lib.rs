@@ -176,12 +176,19 @@ impl<T> Drop for SendWrapper<T> {
 	/// Drops the contained value.
 	///
 	/// # Panics
+	///
 	/// Dropping panics if it is done from a different thread than the one the SendWrapper<T> instance has been
-	/// created with. As an exception, there is no extra panic if the thread is already panicking/unwinding. This is
-	/// because otherwise there would be double panics (usually resulting in an abort) when dereferencing from a wrong
-	/// thread.
+	/// created with.
+	///
+	/// Exceptions:
+	/// - There is no extra panic if the thread is already panicking/unwinding.
+	///   This is because otherwise there would be double panics (usually resulting in an abort)
+	///   when dereferencing from a wrong thread.
+	/// - If `T` has a trivial drop ([`needs_drop::<T>()`] is false) then this method never panics.
 	fn drop(&mut self) {
-		if self.valid() {
+		// If the drop is trivial (`needs_drop` = false), then dropping `T` can't access it
+		// and so it can be safely dropped on any thread.
+		if !std::mem::needs_drop::<T>() || self.valid() {
 			unsafe {
 				// Create a boxed value from the raw pointer. We just checked that the pointer is valid.
 				// Box handles the dropping for us when _dropper goes out of scope.
