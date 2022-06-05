@@ -207,11 +207,8 @@ impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
 	/// Formatting panics if it is done from a different thread than the one
 	/// the SendWrapper<T> instance has been created with.
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		self.assert_valid_for_deref();
-		// This is safe as `self.data` is guaranteed to be alive as long
-		// as `self` is alive.
 		f.debug_struct("SendWrapper")
-			.field("data", unsafe { &*self.data })
+			.field("data", self.deref())
 			.field("thread_id", &self.thread_id)
 			.finish()
 	}
@@ -224,13 +221,7 @@ impl<T: Clone> Clone for SendWrapper<T> {
 	/// Cloning panics if it is done from a different thread than the one
 	/// the SendWrapper<T> instance has been created with.
 	fn clone(&self) -> Self {
-		self.assert_valid_for_deref();
-		// We need to clone the underlying data as well, not just to copy
-		// the pointer.
-		Self {
-			data: Box::into_raw(Box::new(unsafe { &*self.data }.clone())),
-			thread_id: self.thread_id,
-		}
+		Self::new(self.deref().clone())
 	}
 }
 
