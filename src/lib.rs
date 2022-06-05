@@ -97,6 +97,7 @@ mod futures;
 
 use std::fmt;
 use std::marker::Send;
+use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut, Drop};
 use std::thread;
 use std::thread::ThreadId;
@@ -104,7 +105,7 @@ use std::thread::ThreadId;
 /// A wrapper which allows you to move around non-[`Send`]-types between threads, as long as you access the contained
 /// value only from within the original thread and make sure that it is dropped from within the original thread.
 pub struct SendWrapper<T> {
-	data: *mut T,
+	data: ManuallyDrop<T>,
 	thread_id: ThreadId,
 }
 
@@ -113,7 +114,7 @@ impl<T> SendWrapper<T> {
 	/// The wrapper takes ownership of the value.
 	pub fn new(data: T) -> SendWrapper<T> {
 		SendWrapper {
-			data: Box::into_raw(Box::new(data)),
+			data: ManuallyDrop::new(data),
 			thread_id: thread::current().id(),
 		}
 	}
@@ -131,10 +132,14 @@ impl<T> SendWrapper<T> {
 	/// been created with.
 	pub fn take(self) -> T {
 		self.assert_valid_for_deref();
-		let result = unsafe { Box::from_raw(self.data) };
-		// Prevent drop() from being called, as it would drop self.data twice
-		std::mem::forget(self);
-		*result
+
+		// Prevent drop() from being called, as it would drop `self.data` twice
+		let mut this = ManuallyDrop::new(self);
+
+		// Safety:
+		// - We've just checked that it's valid to access `T` from the current thread
+		// - We only move out from `self.data` here and in drop, so `self.data` is present
+		unsafe { ManuallyDrop::take(&mut this.data) }
 	}
 
 	fn assert_valid_for_deref(&self) {
@@ -164,10 +169,11 @@ impl<T> Deref for SendWrapper<T> {
 	/// created with.
 	fn deref(&self) -> &T {
 		self.assert_valid_for_deref();
-		unsafe {
-			// Access the value. We just checked that it is valid.
-			&*self.data
-		}
+
+		// Access the value.
+		//
+		// Safety: We just checked that it is valid to access `T` on the current thread.
+		&*self.data
 	}
 }
 
@@ -180,10 +186,11 @@ impl<T> DerefMut for SendWrapper<T> {
 	/// created with.
 	fn deref_mut(&mut self) -> &mut T {
 		self.assert_valid_for_deref();
-		unsafe {
-			// Access the value. We just checked that it is valid.
-			&mut *self.data
-		}
+
+		// Access the value.
+		//
+		// Safety: We just checked that it is valid to access `T` on the current thread.
+		&mut *self.data
 	}
 }
 
@@ -207,9 +214,12 @@ impl<T> Drop for SendWrapper<T> {
 		// and so it can be safely dropped on any thread.
 		if !std::mem::needs_drop::<T>() || self.valid() {
 			unsafe {
-				// Create a boxed value from the raw pointer. We just checked that the pointer is valid.
-				// Box handles the dropping for us when _dropper goes out of scope.
-				let _dropper = Box::from_raw(self.data);
+				// Drop the inner value
+				//
+				// Safety:
+				// - We've just checked that it's valid to drop `T` on this thread
+				// - We only move out from `self.data` here and in drop, so `self.data` is present
+				ManuallyDrop::drop(&mut self.data);
 			}
 		} else {
 			invalid_drop()
