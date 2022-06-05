@@ -28,8 +28,8 @@
 //! use std::thread;
 //! use std::sync::mpsc::channel;
 //!
-//! // This import is important. It allows you to unwrap the value using deref(),
-//! // deref_mut() or Deref coercion.
+//! // This import is important if you want to use deref() or
+//! // deref_mut() instead of Deref coercion.
 //! use std::ops::{Deref, DerefMut};
 //!
 //! // Rc is a non-Send type.
@@ -43,8 +43,8 @@
 //!
 //! let t = thread::spawn(move || {
 //!
-//!// This would panic (because of dereferencing in wrong thread):
-//!// let value = wrapped_value.deref();
+//!     // This would panic (because of dereferencing in wrong thread):
+//!     // let value = wrapped_value.deref();
 //!
 //! 	// Move SendWrapper back to main thread, so it can be dropped from there.
 //! 	// If you leave this out the thread will panic because of dropping from wrong thread.
@@ -58,13 +58,14 @@
 //! let value = wrapped_value.deref();
 //!
 //! // alternatives for dereferencing:
-//! // let value = *wrapped_value;
-//! // let value: &NonSendType = &wrapped_value;
+//! let value = &*wrapped_value;
+//! let value: &Rc<_> = &wrapped_value;
 //!
-//! // alternatives for mutable dereferencing (value and wrapped_value must be mutable too, then):
-//! // let mut value = wrapped_value.deref_mut();
-//! // let mut value = &mut *wrapped_value;
-//! // let mut value: &mut NonSendType = &mut wrapped_value;
+//! let mut wrapped_value = wrapped_value;
+//! // alternatives for mutable dereferencing:
+//! let value = wrapped_value.deref_mut();
+//! let value = &mut *wrapped_value;
+//! let value: &mut Rc<_> = &mut wrapped_value;
 //! ```
 //!
 //! # Features
