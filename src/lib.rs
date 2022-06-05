@@ -6,10 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! This [Rust] library implements a wrapper type called `SendWrapper` which allows you to move around non-[`Send`] types
+//! This [Rust] library implements a wrapper type called [`SendWrapper`] which allows you to move around non-[`Send`] types
 //! between threads, as long as you access the contained value only from within the original thread. You also have to
 //! make sure that the wrapper is dropped from within the original thread. If any of these constraints is violated,
-//! a panic occurs. `SendWrapper<T>` implements [`Send`] and [`Sync`] for any type `T`.
+//! a panic occurs. [`SendWrapper<T>`] implements [`Send`] and [`Sync`] for any type `T`.
 //!
 //! The idea for this library was born in the context of a [`GTK+`]/[`gtk-rs`]-based application. [`GTK+`] applications
 //! are strictly single-threaded. It is not allowed to call any [`GTK+`] method from a thread different to the main
@@ -67,6 +67,15 @@
 //! // let mut value: &mut NonSendType = &mut wrapped_value;
 //! ```
 //!
+//! # Features
+//!
+//! This crate has a single feature called `futures` that enables [`Future`] and [`Stream`] implementations for [`SendWrapper`].
+//! You can enable it in `Cargo.toml` like so:
+//!
+//! ```toml
+//! send_wrapper = { version = "...", features = ["futures"] }
+//! ```
+//!
 //! # License
 //!
 //! `send_wrapper` is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
@@ -74,14 +83,17 @@
 //! See LICENSE-APACHE.txt, and LICENSE-MIT.txt for details.
 //!
 //! [Rust]: https://www.rust-lang.org
-//! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-//! [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
 //! [`gtk-rs`]: http://gtk-rs.org/
 //! [`GTK+`]: https://www.gtk.org/
 //! [using `Glib`]: http://gtk-rs.org/docs/glib/source/fn.idle_add.html
+//! [`Future`]: std::future::Future
+//! [`Stream`]: futures_core::Stream
+// To build docs locally use `RUSTDOCFLAGS="--cfg docsrs" cargo doc --open --all-features`
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "futures")]
-pub mod futures;
+#[cfg_attr(docsrs, doc(cfg(feature = "futures")))]
+mod futures;
 
 use std::fmt;
 use std::marker::Send;
@@ -97,7 +109,7 @@ pub struct SendWrapper<T> {
 }
 
 impl<T> SendWrapper<T> {
-	/// Create a SendWrapper<T> wrapper around a value of type T.
+	/// Create a `SendWrapper<T>` wrapper around a value of type `T`.
 	/// The wrapper takes ownership of the value.
 	pub fn new(data: T) -> SendWrapper<T> {
 		SendWrapper {
@@ -106,15 +118,16 @@ impl<T> SendWrapper<T> {
 		}
 	}
 
-	/// Returns if the value can be safely accessed from within the current thread.
+	/// Returns `true` if the value can be safely accessed from within the current thread.
 	pub fn valid(&self) -> bool {
 		self.thread_id == thread::current().id()
 	}
 
-	/// Takes the value out of the SendWrapper.
+	/// Takes the value out of the `SendWrapper<T>`.
 	///
-	/// #Panics
-	/// Panics if it is called from a different thread than the one the SendWrapper<T> instance has
+	/// # Panics
+	///
+	/// Panics if it is called from a different thread than the one the `SendWrapper<T>` instance has
 	/// been created with.
 	pub fn take(self) -> T {
 		self.assert_valid_for_deref();
@@ -146,7 +159,8 @@ impl<T> Deref for SendWrapper<T> {
 	/// Returns a reference to the contained value.
 	///
 	/// # Panics
-	/// Derefencing panics if it is done from a different thread than the one the SendWrapper<T> instance has been
+	///
+	/// Dereferencing panics if it is done from a different thread than the one the `SendWrapper<T>` instance has been
 	/// created with.
 	fn deref(&self) -> &T {
 		self.assert_valid_for_deref();
@@ -161,7 +175,8 @@ impl<T> DerefMut for SendWrapper<T> {
 	/// Returns a mutable reference to the contained value.
 	///
 	/// # Panics
-	/// Derefencing panics if it is done from a different thread than the one the SendWrapper<T> instance has been
+	///
+	/// Dereferencing panics if it is done from a different thread than the one the `SendWrapper<T>` instance has been
 	/// created with.
 	fn deref_mut(&mut self) -> &mut T {
 		self.assert_valid_for_deref();
@@ -177,7 +192,7 @@ impl<T> Drop for SendWrapper<T> {
 	///
 	/// # Panics
 	///
-	/// Dropping panics if it is done from a different thread than the one the SendWrapper<T> instance has been
+	/// Dropping panics if it is done from a different thread than the one the `SendWrapper<T>` instance has been
 	/// created with.
 	///
 	/// Exceptions:
@@ -185,6 +200,8 @@ impl<T> Drop for SendWrapper<T> {
 	///   This is because otherwise there would be double panics (usually resulting in an abort)
 	///   when dereferencing from a wrong thread.
 	/// - If `T` has a trivial drop ([`needs_drop::<T>()`] is false) then this method never panics.
+	///
+	/// [`needs_drop::<T>()`]: std::mem::needs_drop
 	fn drop(&mut self) {
 		// If the drop is trivial (`needs_drop` = false), then dropping `T` can't access it
 		// and so it can be safely dropped on any thread.
@@ -204,8 +221,9 @@ impl<T: fmt::Debug> fmt::Debug for SendWrapper<T> {
 	/// Formats the value using the given formatter.
 	///
 	/// # Panics
+	///
 	/// Formatting panics if it is done from a different thread than the one
-	/// the SendWrapper<T> instance has been created with.
+	/// the `SendWrapper<T>` instance has been created with.
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("SendWrapper")
 			.field("data", self.deref())
@@ -218,8 +236,9 @@ impl<T: Clone> Clone for SendWrapper<T> {
 	/// Returns a copy of the value.
 	///
 	/// # Panics
+	///
 	/// Cloning panics if it is done from a different thread than the one
-	/// the SendWrapper<T> instance has been created with.
+	/// the `SendWrapper<T>` instance has been created with.
 	fn clone(&self) -> Self {
 		Self::new(self.deref().clone())
 	}
@@ -248,7 +267,7 @@ fn invalid_drop() {
 
 	if !std::thread::panicking() {
 		// panic because of dropping from wrong thread
-		// only do this while not unwinding (coud be caused by deref from wrong thread)
+		// only do this while not unwinding (could be caused by deref from wrong thread)
 		panic!("{}", DROP_ERROR)
 	}
 }

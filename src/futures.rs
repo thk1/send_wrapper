@@ -1,8 +1,4 @@
 //! [`Future`] and [`Stream`] support for [`SendWrapper`].
-//!
-//! [`Future`]: std::future::Future
-//! [`Stream`]: futures_core::Stream
-
 use std::{
 	future::Future,
 	ops::{Deref as _, DerefMut as _},
@@ -20,6 +16,7 @@ impl<F: Future> Future for SendWrapper<F> {
 	/// Polls this [`SendWrapper`] [`Future`].
 	///
 	/// # Panics
+	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
 	fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -36,6 +33,7 @@ impl<S: Stream> Stream for SendWrapper<S> {
 	/// Polls this [`SendWrapper`] [`Stream`].
 	///
 	/// # Panics
+	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
 	fn poll_next(
