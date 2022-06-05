@@ -1,8 +1,4 @@
 //! [`Future`] and [`Stream`] support for [`SendWrapper`].
-//!
-//! [`Future`]: std::future::Future
-//! [`Stream`]: futures_core::Stream
-
 use std::{
 	future::Future,
 	ops::{Deref as _, DerefMut as _},
@@ -12,10 +8,7 @@ use std::{
 
 use futures_core::Stream;
 
-use super::SendWrapper;
-
-const POLL_ERROR: &'static str =
-	"Polling SendWrapper<T> variable from a thread different to the one it has been created with.";
+use crate::SendWrapper;
 
 impl<F: Future> Future for SendWrapper<F> {
 	type Output = F::Output;
@@ -23,12 +16,12 @@ impl<F: Future> Future for SendWrapper<F> {
 	/// Polls this [`SendWrapper`] [`Future`].
 	///
 	/// # Panics
+	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
+	#[track_caller]
 	fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-		if !self.valid() {
-			panic!(POLL_ERROR);
-		}
+		self.assert_valid_for_poll();
 		// This is safe as `SendWrapper` itself points to the inner `Future`.
 		// So, as long as `SendWrapper` is pinned, the inner `Future` is pinned too.
 		unsafe { self.map_unchecked_mut(Self::deref_mut) }.poll(cx)
@@ -41,15 +34,15 @@ impl<S: Stream> Stream for SendWrapper<S> {
 	/// Polls this [`SendWrapper`] [`Stream`].
 	///
 	/// # Panics
+	///
 	/// Polling panics if it is done from a different thread than the one the [`SendWrapper`]
 	/// instance has been created with.
+	#[track_caller]
 	fn poll_next(
 		self: Pin<&mut Self>,
 		cx: &mut task::Context<'_>,
 	) -> task::Poll<Option<Self::Item>> {
-		if !self.valid() {
-			panic!(POLL_ERROR);
-		}
+		self.assert_valid_for_poll();
 		// This is safe as `SendWrapper` itself points to the inner `Stream`.
 		// So, as long as `SendWrapper` is pinned, the inner `Stream` is pinned too.
 		unsafe { self.map_unchecked_mut(Self::deref_mut) }.poll_next(cx)
