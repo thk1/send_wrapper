@@ -157,6 +157,54 @@ impl<T> SendWrapper<T> {
 	}
 }
 
+impl<T: Send> SendWrapper<T> {
+	/// Takes the value out of the `SendWrapper<T>` without checking for thread as T is Send.
+	pub fn into_inner(self) -> T {
+		let mut this = ManuallyDrop::new(self);
+
+		unsafe { ManuallyDrop::take(&mut this.data) }
+	}
+}
+
+impl<T, E> SendWrapper<Result<T, E>> {
+	/// Transposes a `SendWrapper`` of `Result` into `Result` of two `SendWrapper`.
+	pub fn transpose_both(self) -> Result<SendWrapper<T>, SendWrapper<E>> {
+		let mut this = ManuallyDrop::new(self);
+		let data = unsafe { ManuallyDrop::take(&mut this.data) };
+
+		data.map(|data| SendWrapper {
+			data: ManuallyDrop::new(data),
+			thread_id: this.thread_id,
+		})
+		.map_err(|e| SendWrapper {
+			data: ManuallyDrop::new(e),
+			thread_id: this.thread_id,
+		})
+	}
+
+	/// Transposes a `SendWrapper` of `Result` into `Result` of a `SendWrapper` and
+	/// the `E` given that `E` is Send.
+	pub fn transpose(self) -> Result<SendWrapper<T>, E>
+	where
+		E: Send,
+	{
+		self.transpose_both().map_err(SendWrapper::into_inner)
+	}
+}
+
+impl<T> SendWrapper<Option<T>> {
+	/// Transposes a `SendWrapper` of `Option` into a `Option` of `SendWrapper`
+	pub fn transpose(self) -> Option<SendWrapper<T>> {
+		let mut this = ManuallyDrop::new(self);
+		let data = unsafe { ManuallyDrop::take(&mut this.data) };
+
+		data.map(|data| SendWrapper {
+			data: ManuallyDrop::new(data),
+			thread_id: this.thread_id,
+		})
+	}
+}
+
 unsafe impl<T> Send for SendWrapper<T> {}
 unsafe impl<T> Sync for SendWrapper<T> {}
 
@@ -406,5 +454,60 @@ mod tests {
 			let _ = w.clone();
 		});
 		assert!(t.join().is_err());
+	}
+
+	#[test]
+	fn test_removing_wrapper() {
+		let three = SendWrapper::new(3);
+		let three = thread::spawn(move || three.into_inner()).join().unwrap();
+
+		assert_eq!(three, 3);
+	}
+
+	#[test]
+	fn transpose_result() {
+		type WrappedResult = SendWrapper<Result<Rc<i32>, i32>>;
+
+		let r = WrappedResult::new(Ok(Rc::new(3))).transpose();
+		match &r {
+			Ok(rc) => {
+				assert_eq!(***rc, 3);
+			}
+			Err(e) => panic!("Expected ok, got err {e:?}", e = e),
+		}
+
+		let t = thread::spawn(move || {
+			let _ = r.clone();
+		});
+		assert!(t.join().is_err());
+
+		let r = WrappedResult::new(Err(5)).transpose();
+		match r {
+			Ok(three) => panic!("Expected err, got ok: {three:?}", three = three),
+			Err(e) => assert_eq!(e, 5),
+		}
+	}
+
+	#[test]
+	fn transpose_option() {
+		type WrappedOption = SendWrapper<Option<Rc<i32>>>;
+
+		let r = WrappedOption::new(Some(Rc::new(3))).transpose();
+		match &r {
+			Some(rc) => {
+				assert_eq!(***rc, 3);
+			}
+			None => panic!("Expected Some, None"),
+		}
+
+		let t = thread::spawn(move || {
+			let _ = r.clone();
+		});
+		assert!(t.join().is_err());
+
+		let r = WrappedOption::new(None).transpose();
+		if let Some(three) = r {
+			panic!("Expected some, got some: {three:?}", three = three)
+		}
 	}
 }
